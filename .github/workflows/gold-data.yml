@@ -1,0 +1,291 @@
+name: Gold data and app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - '*.py'
+      - backend/**
+      - requirements.txt
+      - .github/workflows/gold-data.yml
+  schedule:
+    - cron: '17 */4 * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: gold-data-pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install existing engine dependencies
+        shell: bash
+        run: |
+          if [ -f backend/requirements.txt ]; then
+            python -m pip install -r backend/requirements.txt
+          elif [ -f requirements.txt ]; then
+            python -m pip install -r requirements.txt
+          else
+            echo "requirements.txt is missing from root and backend."
+            exit 1
+          fi
+
+      - name: Generate public macro report
+        shell: bash
+        env:
+          DATA_DIR: ${{ runner.temp }}/gold-data
+          MODEL_DIR: ${{ runner.temp }}/no-models
+          PAGES_OUTPUT: ${{ github.workspace }}/site
+          MAX_CLASSIFICATIONS_PER_REFRESH: '0'
+        run: |
+          test -f index.html
+          mkdir -p site
+          cp index.html site/index.html
+          python - <<'PYTHON'
+          import sys
+          import asyncio
+          import json
+          import os
+          from pathlib import Path
+
+          ROOT = Path.cwd()
+          ENGINE = (
+              ROOT / "backend"
+              if (ROOT / "backend" / "core.py").exists()
+              else ROOT
+          )
+          sys.path.insert(0, str(ENGINE))
+
+          from core import factor, iso
+          import real_yield_engine as real
+          import positioning_engine as positioning
+          import dollar_engine as dollar
+          from aggregator import aggregate
+          from driver_engines import run as drivers
+          from decision_engine import build_report
+
+          def public_lineage(item):
+              data = item.get("data") or {}
+              fields = {
+                  "source": item.get("source"),
+                  "status": item.get("status"),
+                  "fetched_at": item.get("fetched_at"),
+                  "observed_at": data.get("observed_at"),
+                  "published_at": data.get("published_at"),
+                  "warning": item.get("warning"),
+              }
+              return {
+                  key: value
+                  for key, value in fields.items()
+                  if value is not None
+              }
+
+          def sanitize(report):
+              for item in report["factors"]:
+                  item["lineage"] = [
+                      public_lineage(source)
+                      for source in item.get("lineage", [])
+                  ]
+                  details = item.get("details", {})
+
+                  if item["name"] == "positioning":
+                      allowed = {
+                          "percentile",
+                          "net_contracts",
+                          "long_contracts",
+                          "short_contracts",
+                          "observed_at",
+                          "publication_note",
+                          "history",
+                          "weekly_change",
+                      }
+                  elif item["name"] == "real_yield":
+                      allowed = {
+                          "observed_at",
+                          "five_session_change_bp",
+                          "momentum_bp",
+                          "acceleration_bp",
+                      }
+                  elif item["name"] == "dollar":
+                      allowed = {
+                          "observed_at",
+                          "roc_5d_percent",
+                          "yield_divergence",
+                          "breakout",
+                          "breakdown",
+                      }
+                  else:
+                      allowed = set()
+
+                  item["details"] = {
+                      key: value
+                      for key, value in details.items()
+                      if key in allowed
+                  }
+
+              for alert in report["divergences"]:
+                  alert["lineage"] = {
+                      key: [
+                          public_lineage(source)
+                          for source in sources
+                      ]
+                      for key, sources in alert.get(
+                          "lineage", {}
+                      ).items()
+                  }
+
+              intelligence = report["intelligence"]
+
+              for engine in intelligence["engines"]:
+                  engine["lineage"] = [
+                      public_lineage(source)
+                      for source in engine.get("lineage", [])
+                  ]
+                  engine["metrics"] = {}
+
+              for case in ("bull_case", "bear_case"):
+                  for evidence in intelligence["review"][case]:
+                      evidence["lineage"] = [
+                          public_lineage(source)
+                          for source in evidence.get("lineage", [])
+                      ]
+
+              intelligence["execution"] = {
+                  "ready": False,
+                  "reason": (
+                      "Scheduled snapshots are not "
+                      "executable live quotes."
+                  ),
+              }
+              intelligence["final_decision"] = "NO TRADE"
+              intelligence["confidence"] = 0
+              intelligence["reason"] = (
+                  "Scheduled research snapshot: live execution "
+                  "and validated intraday models are not connected."
+              )
+
+              for horizon in intelligence["horizons"].values():
+                  horizon["decision"] = "NO TRADE"
+
+              report["publication"] = {
+                  "mode": "scheduled_snapshot",
+                  "built_at": iso(),
+                  "not_live": True,
+                  "raw_provider_payloads_removed": True,
+                  "note": (
+                      "Source availability and scheduled "
+                      "run times are not guaranteed."
+                  ),
+              }
+              return report
+
+          async def safe(name, weight, operation):
+              try:
+                  return await operation
+              except Exception as error:
+                  return factor(
+                      name,
+                      weight,
+                      None,
+                      "Source unavailable.",
+                      [{
+                          "source": name,
+                          "status": "unavailable",
+                          "warning": type(error).__name__,
+                      }],
+                  )
+
+          async def main():
+              real_yields, positions = await asyncio.gather(
+                  safe("real_yield", 0.35, real.run()),
+                  safe("positioning", 0.25, positioning.run()),
+              )
+
+              dollars = await safe(
+                  "dollar",
+                  0.10,
+                  dollar.run(real_yields),
+              )
+
+              flows = factor(
+                  "flows",
+                  0.20,
+                  None,
+                  "Verified ETF/WGC inputs are not connected "
+                  "in this public snapshot.",
+                  [],
+              )
+
+              narratives = factor(
+                  "narrative",
+                  0.10,
+                  None,
+                  "A persistent classified narrative archive "
+                  "is not connected in this public snapshot.",
+                  [],
+              )
+
+              report = aggregate([
+                  real_yields,
+                  positions,
+                  flows,
+                  dollars,
+                  narratives,
+              ])
+
+              engines = await drivers(report)
+              report["intelligence"] = build_report(
+                  engines,
+                  report,
+              )
+
+              output = Path(
+                  os.environ.get("PAGES_OUTPUT", "site")
+              )
+              (output / "data").mkdir(
+                  parents=True,
+                  exist_ok=True,
+              )
+              (output / "data" / "latest.json").write_text(
+                  json.dumps(
+                      sanitize(report),
+                      allow_nan=False,
+                  ),
+                  encoding="utf-8",
+              )
+
+              print("Public macro snapshot generated.")
+
+          if __name__ == "__main__":
+              asyncio.run(main())
+          PYTHON
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Publish app and data
+        id: deployment
+        uses: actions/deploy-pages@v4
