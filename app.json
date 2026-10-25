@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Gold Regime Terminal",
+    "slug": "gold-regime-terminal",
+    "version": "2.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      },
+      "bundleIdentifier": "com.goldintelligence.terminal"
+    },
+    "android": {
+      "usesCleartextTraffic": true,
+      "package": "com.goldintelligence.terminal"
+    }
+  }
+}

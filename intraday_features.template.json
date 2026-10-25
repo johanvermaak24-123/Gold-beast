@@ -1,0 +1,74 @@
+{
+  "engines": [
+    {
+      "engine": "real_yield",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "usd",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "liquidity",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "bond",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "fed",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "risk",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "inflation",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "recession",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "positioning",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    },
+    {
+      "engine": "technical",
+      "gold_support": null,
+      "known_at": null,
+      "source_url": null,
+      "reason": null
+    }
+  ]
+}

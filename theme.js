@@ -1,0 +1,4 @@
+import { StyleSheet } from 'react-native';
+export const colors={bg:'#090e14',card:'#121c28',text:'#e6edf6',muted:'#8da0b7',gold:'#e6c476',up:'#55dbaa',down:'#ff7e89'};
+export const s=StyleSheet.create({wrap:{padding:18,gap:14,paddingBottom:40},card:{backgroundColor:colors.card,padding:16,borderRadius:12,gap:9},title:{color:colors.text,fontSize:20,fontWeight:'800'},text:{color:colors.text,fontSize:14,lineHeight:22},muted:{color:colors.muted,fontSize:12,lineHeight:19},warning:{color:colors.gold,fontSize:13,lineHeight:21},row:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:10},input:{color:colors.text,borderWidth:1,borderColor:'#304058',borderRadius:8,padding:11,flex:1},button:{backgroundColor:'#28364a',padding:12,borderRadius:8}});
+export const chart={backgroundGradientFrom:colors.card,backgroundGradientTo:colors.card,color:(o=1)=>`rgba(230,196,118,${o})`,labelColor:()=>colors.muted,decimalPlaces:0,propsForDots:{r:'0'}};
