@@ -11,7 +11,7 @@ on:
       - requirements.txt
       - .github/workflows/gold-data.yml
   schedule:
-    - cron: '17 */4 * * *'
+    - cron: '17 * * * *'
 
 permissions:
   contents: read
@@ -106,6 +106,7 @@ jobs:
                       public_lineage(source)
                       for source in item.get("lineage", [])
                   ]
+
                   details = item.get("details", {})
 
                   if item["name"] == "positioning":
@@ -173,19 +174,25 @@ jobs:
               intelligence["execution"] = {
                   "ready": False,
                   "reason": (
-                      "Scheduled snapshots are not "
+                      "Scheduled public snapshots are not "
                       "executable live quotes."
                   ),
               }
-              intelligence["final_decision"] = "NO TRADE"
-              intelligence["confidence"] = 0
-              intelligence["reason"] = (
-                  "Scheduled research snapshot: live execution "
-                  "and validated intraday models are not connected."
-              )
 
-              for horizon in intelligence["horizons"].values():
-                  horizon["decision"] = "NO TRADE"
+              # Preserve the engine's calculated decision,
+              # confidence and readiness explanations.
+              # No hardcoded BUY, SELL or NO TRADE override.
+              intelligence["research_context"] = {
+                  "bias": report["bias"],
+                  "score": report["final_score"],
+                  "available_weight_percent": (
+                      report["coverage_percent"]
+                  ),
+                  "dominant_driver": report["dominant_driver"],
+                  "status": (
+                      "uncalibrated_factor_context_not_entry_signal"
+                  ),
+              }
 
               report["publication"] = {
                   "mode": "scheduled_snapshot",
@@ -197,6 +204,7 @@ jobs:
                       "run times are not guaranteed."
                   ),
               }
+
               return report
 
           async def safe(name, weight, operation):
@@ -254,6 +262,7 @@ jobs:
               ])
 
               engines = await drivers(report)
+
               report["intelligence"] = build_report(
                   engines,
                   report,
@@ -266,6 +275,7 @@ jobs:
                   parents=True,
                   exist_ok=True,
               )
+
               (output / "data" / "latest.json").write_text(
                   json.dumps(
                       sanitize(report),
