@@ -39,6 +39,9 @@ async def refresh():
             from probability_model import FEATURES
             engines=[{'engine':name,'status':'unavailable','gold_support':None,'reason':'Driver collection failed: '+type(exc).__name__,'resolution':'daily','metrics':{},'lineage':[]} for name in FEATURES]
         candidate['intelligence']=await asyncio.to_thread(build_report,engines,candidate)
+        from research_engine import run as daily_research
+        from supplemental import run as supplemental
+        candidate['research'],candidate['supplemental']=await asyncio.gather(daily_research(),supplemental())
         _snapshot=candidate
         _refreshed=time.monotonic()
         return _snapshot
@@ -99,3 +102,7 @@ def capabilities():
             'llm_configured':bool(os.getenv('OPENAI_API_KEY') and os.getenv('OPENAI_MODEL')),
             'trade_execution':False,
             'note':'File presence is configuration status, not validation or accuracy.'}
+
+@app.get('/research')
+async def research_view():
+    return (await refresh()).get('research', {'status':'unavailable'})
